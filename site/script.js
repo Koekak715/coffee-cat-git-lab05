@@ -3,6 +3,8 @@ const toggle = document.querySelector('.menu-toggle');
 const navigation = document.querySelector('.navigation');
 function closeNavigation(){toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-label','Открыть меню');navigation.classList.remove('open');document.body.classList.remove('nav-open');}
 toggle.addEventListener('click',()=>{const open=toggle.getAttribute('aria-expanded')!=='true';toggle.setAttribute('aria-expanded',String(open));toggle.setAttribute('aria-label',open?'Закрыть меню':'Открыть меню');navigation.classList.toggle('open',open);document.body.classList.toggle('nav-open',open);});
+document.documentElement.classList.add('js-enabled');
+navigation.addEventListener('focusout',()=>{queueMicrotask(()=>{if(!navigation.contains(document.activeElement)&&document.activeElement!==toggle)closeNavigation();});});
 navigation.querySelectorAll('a').forEach(link=>link.addEventListener('click',closeNavigation));
 document.addEventListener('keydown',event=>{if(event.key==='Escape'&&navigation.classList.contains('open')){closeNavigation();toggle.focus();}});
 window.matchMedia('(min-width:621px)').addEventListener('change',event=>{if(event.matches)closeNavigation();});
@@ -11,8 +13,7 @@ window.addEventListener('scroll',()=>header.classList.toggle('scrolled',window.s
 if('IntersectionObserver' in window){
   const motion=window.matchMedia('(prefers-reduced-motion:reduce)');
   if(!motion.matches){document.body.classList.add('motion-ready');const observer=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting){entry.target.classList.add('visible');observer.unobserve(entry.target);}}),{threshold:.08});document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));}
-  const sectionObserver=new IntersectionObserver(entries=>{for(const entry of entries){if(entry.isIntersecting){navigation.querySelectorAll('a').forEach(a=>{if(a.hash==='#'+entry.target.id)a.setAttribute('aria-current','location');else a.removeAttribute('aria-current');});}}},{rootMargin:'-15% 0px -55% 0px',threshold:0});
-  document.querySelectorAll('main section[id]').forEach(el=>sectionObserver.observe(el));
+
 }
 const filterButtons=document.querySelectorAll('.filter');
 filterButtons.forEach(button=>button.addEventListener('click',()=>{filterButtons.forEach(b=>{b.classList.toggle('active',b===button);b.setAttribute('aria-pressed',String(b===button));});let count=0;document.querySelectorAll('.drink-card').forEach(card=>{card.hidden=button.dataset.filter!=='all'&&card.dataset.category!==button.dataset.filter;if(!card.hidden){count++;card.classList.add('visible');}});document.querySelector('#filter-status').textContent=`Показано напитков: ${count}`;}));
@@ -27,7 +28,7 @@ const drinkDetails={
 };
 let previousFocus;
 function showDetails(title,eyebrow,paragraphs){previousFocus=document.activeElement;document.querySelector('#dialog-title').textContent=title;document.querySelector('#dialog-eyebrow').textContent=eyebrow;const content=document.querySelector('#dialog-content');content.replaceChildren();paragraphs.forEach(item=>{const p=document.createElement('p');p.textContent=typeof item==='string'?item:item.text;if(item.className)p.className=item.className;content.append(p);});dialog.showModal();document.body.classList.add('modal-open');}
-document.querySelectorAll('[data-drink]').forEach(button=>button.addEventListener('click',()=>{const d=drinkDetails[button.dataset.drink];showDetails(d.name,'ВАША ЧАШКА СЧАСТЬЯ',[{text:d.price,className:'dialog-price'},d.text,{text:d.ingredients,className:'allergen-note'},'Для напитков с молоком доступна растительная альтернатива +60 ₽. Сообщите бариста об аллергии: напитки готовятся на общем оборудовании.']);}));
+document.querySelectorAll('[data-drink]').forEach(button=>button.addEventListener('click',()=>{const d=drinkDetails[button.dataset.drink];showDetails(d.name,'ВАША ЧАШКА СЧАСТЬЯ',[{text:d.price,className:'dialog-price'},d.text,{text:d.ingredients,className:'allergen-note'},button.dataset.drink==='americano'?'Американо готовится без молока. Сообщите бариста об аллергии: используется общее оборудование.':'Для напитков с молоком доступна растительная альтернатива +60 ₽. Сообщите бариста об аллергии: используется общее оборудование.']);}));
 const offerDetails={
   morning:{title:'Утро начинается мягче',paragraphs:['Скидка 20% на один кофейный напиток из меню по будням с 08:00 до 11:00. Действует в кофейне и на напитки с собой.','Доплата за растительное молоко оплачивается полностью. С другими акциями и отметками по карте гостя не суммируется.']},
   friend:{title:'Приводи своего человека',paragraphs:['Каждую среду с 16:00 до 19:00 два капучино «Котик» объёмом 250 мл — по цене одного. Оба напитка выдаются в одном заказе.','Растительное молоко оплачивается дополнительно за каждый напиток. С другими акциями и картой гостя не суммируется.']},
@@ -41,3 +42,22 @@ dialog.addEventListener('click',event=>{if(event.target===dialog){const box=dial
 dialog.addEventListener('close',()=>{document.body.classList.remove('modal-open');previousFocus?.focus();});
 document.querySelector('#copy-address').addEventListener('click',async()=>{const status=document.querySelector('#copy-status');try{await navigator.clipboard.writeText('Москва, ул. Примерная, 12 (демонстрационный адрес)');status.textContent='Адрес скопирован. Это пример для макета.';}catch{status.textContent='Адрес для копирования: Москва, ул. Примерная, 12 (пример).';}});
 document.querySelector('#year').textContent=new Date().getFullYear();
+
+// Choose the last section above the header line. The rule is independent of viewport aspect ratio.
+let navigationFrame = false;
+function updateCurrentSection(){
+  navigationFrame = false;
+  const boundary = header.getBoundingClientRect().bottom + 24;
+  let current = '';
+  for(const section of document.querySelectorAll('main section[id]')){
+    if(section.getBoundingClientRect().top <= boundary)current = section.id;
+  }
+  navigation.querySelectorAll('a').forEach(link=>{
+    if(link.hash === '#' + current)link.setAttribute('aria-current','location');
+    else link.removeAttribute('aria-current');
+  });
+}
+function scheduleNavigation(){if(!navigationFrame){navigationFrame=true;requestAnimationFrame(updateCurrentSection);}}
+window.addEventListener('scroll',scheduleNavigation,{passive:true});
+window.addEventListener('resize',scheduleNavigation);
+updateCurrentSection();
